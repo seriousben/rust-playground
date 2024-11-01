@@ -1,0 +1,12 @@
+[package]
+name = "rocksdb_transactiondb"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.92"
+rocksdb = { git = "https://github.com/rust-rocksdb/rust-rocksdb", branch = "master", features=["multi-threaded-cf"]}
+strum = { version = "0.26.3", features = ["derive"] }
+tokio = { version = "1.41.0", features = ["full"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
