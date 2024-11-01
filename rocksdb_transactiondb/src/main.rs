@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
     }
 
     // ################################################################
-    // ERROR: get_for_update does not prevent get in other txn
+    // get_for_update EXCLUSIVE=false does not prevent get in other txn
     // ################################################################
     {
         let txn1 = db.transaction();
@@ -128,7 +128,7 @@ async fn main() -> Result<()> {
     }
 
     // ################################################################
-    // ERROR: get_for_update locks the key for puts in other txn
+    // ERROR: get_for_update EXCLUSIVE=false locks the key for puts in other txn
     // ################################################################
     {
         let txn1 = db.transaction();
@@ -136,6 +136,29 @@ async fn main() -> Result<()> {
 
         txn1.get_for_update_cf(&DBColumnFamilies::User.cf_db(&db), b"user1", false)?;
         let res = txn2.put_cf(&DBColumnFamilies::User.cf_db(&db), b"user1", b"user1-txn2");
+        assert!(res.is_err(), "put in txn2 should fail");
+        assert_eq!(
+            res.err().unwrap().to_string(),
+            "Operation timed out: Timeout waiting to lock key"
+        );
+    }
+
+    // ################################################################
+    // ERROR: get_for_update EXCLUSIVE=true prevents any get_for_update in other txn
+    // ################################################################
+    {
+        let txn1 = db.transaction();
+        let txn2 = db.transaction();
+
+        txn1.get_for_update_cf(&DBColumnFamilies::User.cf_db(&db), b"user1", true)?;
+        let res = txn2.get_for_update_cf(&DBColumnFamilies::User.cf_db(&db), b"user1", true);
+        assert!(res.is_err(), "put in txn2 should fail");
+        assert_eq!(
+            res.err().unwrap().to_string(),
+            "Operation timed out: Timeout waiting to lock key"
+        );
+
+        let res = txn2.get_for_update_cf(&DBColumnFamilies::User.cf_db(&db), b"user1", false);
         assert!(res.is_err(), "put in txn2 should fail");
         assert_eq!(
             res.err().unwrap().to_string(),
