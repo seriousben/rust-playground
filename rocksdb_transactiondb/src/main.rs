@@ -87,7 +87,7 @@ async fn main() -> Result<()> {
     }
 
     // ################################################################
-    // ERROR: get_cf does not lock key in transaction
+    // get_cf does not lock key in transaction
     // ################################################################
     {
         let txn1 = db.transaction();
@@ -167,7 +167,7 @@ async fn main() -> Result<()> {
     }
 
     // ################################################################
-    // try overwrites to different keys in different transactions (with threads)
+    // try overwrites to different keys in different transactions (with tasks)
     // ################################################################
     {
         let mut task_handles = vec![];
@@ -236,6 +236,29 @@ async fn main() -> Result<()> {
 
         let user = String::from_utf8(raw_user).unwrap();
         assert_eq!("user1-txn2", user);
+    }
+
+    // ################################################################
+    // ERROR: get_for_update EXCLUSIVE=true prevents any get_for_update in other txn
+    // ################################################################
+    {
+        let txn1 = db.transaction();
+        let txn2 = db.transaction();
+
+        txn1.get_for_update_cf(&DBColumnFamilies::User.cf_db(&db), b"user1", true)?;
+        let res = txn2.get_for_update_cf(&DBColumnFamilies::User.cf_db(&db), b"user1", true);
+        assert!(res.is_err(), "put in txn2 should fail");
+        assert_eq!(
+            res.err().unwrap().to_string(),
+            "Operation timed out: Timeout waiting to lock key"
+        );
+
+        let res = txn2.get_for_update_cf(&DBColumnFamilies::User.cf_db(&db), b"user1", false);
+        assert!(res.is_err(), "put in txn2 should fail");
+        assert_eq!(
+            res.err().unwrap().to_string(),
+            "Operation timed out: Timeout waiting to lock key"
+        );
     }
 
     Ok(())
